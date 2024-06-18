@@ -13,10 +13,10 @@ app.use(express.json());
 const port = 5001;
 
 const db = mysql.createConnection({
-  host: 'localhost',
-  user: 'root',
-  password: 'password',
-  database: 'zero',
+  host: 'sql8.freesqldatabase.com',
+  user: 'sql8714537',
+  password: 'P1IHQKXb16',
+  database: 'sql8714537',
 });
 
 function createNewSession(id){
