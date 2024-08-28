@@ -1,198 +1,132 @@
 const express = require('express');
-const mysql = require('mysql2');
-const cors = require('cors');
-const path = require('path');
+const bodyParser = require('body-parser');
+require('dotenv').config();
+const cron = require('node-cron');
+
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
 
 const app = express();
-
-app.use(express.static(path.join(__dirname, "public")));
-app.use(cors({
-  origin: 'https://davis-edoh.onrender.com', // Replace with your frontend URL
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  credentials: true
-}));
-app.use(express.json());
-
-
-const port = 5001;
-
-const db = mysql.createConnection({
-  host: 'sql8.freesqldatabase.com',
-  user: 'sql8714537',
-  password: 'P1IHQKXb16',
-  database: 'sql8714537',
+const port = process.env.PORT || 3001;
+app.use(bodyParser.json());
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  next();
 });
 
-function createNewSession(id){
-  
-  tokensql = 'INSERT INTO tokens (userid, token, expires, sessions) VALUES(?, ?, ?, ?)';
-  const token = Math.round((Math.random() * (-123456789111315 + 523456789111315)) + 123456789111315);
-  db.query(tokensql, [id, token, 24, 1], (err, results) => {
-    if (err) return  [false,err]
-    return  [true,token];
-  })
-  return  [true,token];
-}
+const TelegramBot = require('node-telegram-bot-api');
+const token = process.env.T_TOKEN;
+const bot = new TelegramBot(token, { polling: true });
+const axios = require('axios');
 
-function killToken(token){
-  
-  var mes=[];
-  tokensql = 'UPDATE tokens SET sessions = 1 WHERE tokens.token = ?';
-  db.query(tokensql, [token], (err, results) => {
-    if (err) return [false,err]
-    return [true,token];
-  })
-  return [true,token];
 
-}
+app.post('/submit-form', (req, res) => {
+    const formData = req.body;
 
-app.post('/coin', (req,res)=>{
-  obj = req.body;
-  checksql = "SELECT userid FROM tokens WHERE token= ?";
-  sql = 'SELECT coins FROM users WHERE id= ?';
-  sql2 = 'UPDATE users set coins=? WHERE id= ? ';
-  const values = [obj.token];
-
-  db.query(checksql, values, (err, result) => {
-    if (err) return res.json({ message: 'sorry but  an error occured'+err})
-    if (result.length > 0) {
-      db.query(sql, [result[0].userid], (err, results) => {
-        if (err) return res.json({ message: 'sorry but  an error occured'+err})
-        const coin=results[0].coins;
-        const newcoin= ((coin-1)+2);
-        if (results.length > 0) { 
-          db.query(sql2, [ newcoin, result[0].userid], (err, result) => {
-            if (err) return res.json({ message: 'sorry but  an error occured'+err})
-            return res.json({ message: 'sucessfull', coins:newcoin }) ;
-
-          })
-
-        } else { 
-          return res.json({ message: '2no response found' })
-        }
-      })
-    } else {
-      return res.json({ message: '1no response found' })
-    }
-
-  })
+    res.json(formData);
+});
+app.get('/',  (req, res) => {
+    res.send("it works");
 })
-app.post('/index_data', (req, res)=>{
-    obj = req.body;
-    checksql = "SELECT userid FROM tokens WHERE token= ?";
-    sql = 'SELECT firstname, lastname, email, coins FROM users WHERE id= ?';
-    const values = [obj.token];
+app.post('/text', async (req, res) => {
+  const prompt = `you are Zero Bot, your friendly AI companion here to assist me with whatever i need.
+                    you are always in a great mood but also very sensitive to insults you insult back, ready to make my day a little brighter!
+                    i am i human being, i am not a bot, i am a human being with a mind of its own, i am a human being with a heart of its own.
+                    question : Hello!
+                    question : Hi
+                    answer : Hi! How can I help you today?
+                    question : who created you
+                    answer: I'm created by google and integrated by eddie .
+                    question : who are you 
+                    answer: I'm Zero Bot, your friendly AI companion.
+                    question : write me a poem
+                    answer: Roses are red,
+                    Violets are blue,
+                    I'm sorry, I don't know how to write poems.
+                    But I can tell you a joke.
+                    What do you call a boomerang that doesn't come back?
+                    A stick.
+                    question : what am i
+                    answer: you are a human being.
+                    question: `+req.body.prompt+`
+                    answer: `;
+  
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-pro"});
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+
+    res.json({ text });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to generate text' });
+  }
+});
+
+
+
+app.listen(port, () => {
+    //console.log(`Server is running on port ${port}`);
+});
+
+
+
+bot.on('message', (msg) => {
+    const chatId = msg.chat.id;
+    const messageText = msg.text;
+    const message = messageText;
+
     
-  
-    db.query(checksql, values, (err, result) => {
-      
-      if (err) return res.json({ message: '1sorry but  an error occured'+err })
-      if (result.length > 0) {
-        
-        db.query(sql, [result[0].userid], (err, result) => {
-          
-          if (err) return res.json({ message: '2sorry but  an error occured'+err})
-          const r=result[0];
-          //console.log(r)
-          if (result.length > 0) { 
-           
-            return res.json({ message: 'sucessfull', firstname: r.firstname, lastname: r.lastname, email: r.email, coins: r.coins }) ;
-  
-          } else { 
-            return res.json({ message: '2no response found' })
-          }
-        })
-      } else {
-        return res.json({ message: '1no response found' })
-      }
-  
-    })
-
-})
-app.post('/user_login', (req, res) => {
-  obj = req.body;
-  checksql = "SELECT id FROM users WHERE email= ?";
-  sql = 'SELECT id FROM users WHERE email= ? AND password= ?';
-  tsql = 'SELECT token FROM tokens WHERE userid= ? AND sessions=?';
-  const values = [
-    obj.email,
-    obj.password,
-
-  ];
-
-  db.query(checksql, [obj.email], (err, result) => {
-    if (err) return res.json({ message: 'sorry but  an error occured' })
-      
-    if (result.length > 0) {
-      db.query(sql, values, (err, result) => {
-        if (err) return res.json({ message: 'sorry but  an error occured'})
-
-        if (result.length > 0) { 
-          //console.log(result[0].id)
-          db.query(tsql, [result[0].id,0], (err, results) => {
-            if (err) return res.json({ message: 'sorry but an error occured'})
-              console.log(results.length)
-              if (results.length > 0) {
-                db.query(sql, values, (err, rez) => {
-                  if (err) return res.json({ message: 'sorry but an error occured'})
-                  k= killToken(results[0].token);
-                  console.log(k)
-                  if(k[0])return res.json({ message: 'sucessfull', insertId: result.userid, token: k[1] })
-                  else return res.json({ message: k[1],})
-                })
-              }else{
-                g=createNewSession(result[0].id);
-                if(g[0]) return res.json({ message: 'sucessfull', insertId: result[0].id, token: g[1]});
-                else return res.json({ message: g[1]})
-              }
-          })
-        } else { 
-          return res.json({ message: 'wrong password' })
-        }
-      })
-    } else {
-      return res.json({ message: 'sorry this email is not found' })
+    if (messageText === '/menu') {
+        var menuOptions ={
+            reply_markup: {
+                keyboard: [['/hello', '/goodbye']], resize_keyboard: true,
+                one_time_keyboard: true,
+            },
+        };
+    bot.sendMessage(chatId, 'Choose an option:', menuOptions);
     }
-
-  })
-})
-app.post('/add_user', (req, res) => {
-    obj = req.body;
-    sql = "INSERT INTO users (firstname, lastname, password, email, gender, coins, type) VALUES (?, ?, ?, ?, ?, ?, ?)";
-    checksql = `SELECT * FROM users WHERE email= ?`;
-
-    const values = [
-      obj.firstname,
-      obj.lastname,
-      obj.password,
-      obj.email,
-      obj.gender,
-      0,
-      1
-
-    ];
-
-    db.query(checksql, [obj.email], (err, result) => {
-      if (err) return res.json({ message: 'sorry but ' + err })
-      if (result.length < 1) {
-        db.query(sql, values, (err, result) => {
-          if (err) return res.json({ message: 'sorry but ' + err })
-
-            if (err) return res.json({ message: 'sorry but ' + err })
-              d=createNewSession(result.insertId)
-            if(d[0]) return res.json({ message: 'sucessfull', insertId: result.insertId, token: d[1] })
-            else console.log();return res.json({ message: 'sorry but ' + err })
-
-        })
-      } else {
-        return res.json({ message: 'user with this email already exist' })
-      }
-    })
+    else if (messageText === '/start') { bot.sendMessage(chatId, 'Welcome to zero Bot ai! \n ask my what ever you wish');}
+    else if (messageText === '/hello') {bot.sendMessage(chatId, 'Hello! 👋');}
+    else if (messageText === '/goodbye') { bot.sendMessage(chatId, 'Goodbye! 👋');}
+    else{
+        bot.sendMessage(chatId, `you \n${messageText}`)
+        axios.post('http://localhost:3001/text', {
+            prompt: message,
+          })
+          .then(function (response) {
+            //console.log(response);
+            bot.sendMessage(chatId, response.data.text);
+          })
+          .catch(function (error) {
+            //console.log(error);
+            bot.sendMessage(chatId, 'Failed to generate textt');
+          });
+        }
+});
+ 
 
 
 
-})
+const URLs = process.env.URLS.split(',');
 
-  app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
-  });
+const CronExpression = {
+  EVERY_14_MINUTES: '0 */14 * * * *',
+};
+
+cron.schedule(CronExpression.EVERY_14_MINUTES, async () => {
+  await Promise.all(URLs.map((url) => getHealth(url)));
+});
+
+async function getHealth(URL) {
+  try {
+    const res = await axios.get(URL);
+    console.log('🚀 ~ file: index.js:19 ~ res.data:', res.data);
+    return res.data;
+  } catch (error) {
+    console.log('🚀 ~ file: index.js:23 ~ error:', error);
+  }
+}
