@@ -6,7 +6,11 @@ const path = require('path');
 const app = express();
 
 app.use(express.static(path.join(__dirname, "public")));
-app.use(cors());
+app.use(cors({
+  origin: 'https://davis-edoh.onrender.com', // Replace with your frontend URL
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: true
+}));
 app.use(express.json());
 
 
